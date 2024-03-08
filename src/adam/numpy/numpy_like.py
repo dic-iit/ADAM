@@ -106,6 +106,13 @@ class NumpyLike(ArrayLike):
         """Overrides - operator"""
         return NumpyLike(-self.array)
 
+    def __eq__(self, other: Union["NumpyLike", npt.ArrayLike]) -> bool:
+        """Overrides == operator"""
+        if type(self) is type(other):
+            return self.array == other.array
+        else:
+            return self.array == other
+
 
 class NumpyLikeFactory(ArrayLikeFactory):
     @staticmethod
@@ -213,3 +220,42 @@ class SpatialMath(SpatialMath):
             return -np.cross(np.array(x), np.eye(3), axisa=0, axisb=0)
         x = x.array
         return NumpyLike(-np.cross(np.array(x), np.eye(3), axisa=0, axisb=0))
+
+    @staticmethod
+    def vee(x: Union["NumpyLike", npt.ArrayLike]) -> "NumpyLike":
+        """
+        Args:
+            x (Union[NumpyLike, npt.ArrayLike]): skew symmetric matrix
+
+        Returns:
+            NumpyLike: vector from the skew symmetric matrix
+        """
+        if not isinstance(x, NumpyLike):
+            return np.array([x[2, 1], x[0, 2], x[1, 0]])
+        return np.array([x.array[2, 1], x.array[0, 2], x.array[1, 0]])
+
+    @staticmethod
+    def inv(x: Union["NumpyLike", npt.ArrayLike]) -> "NumpyLike":
+        """
+        Args:
+            x (Union["NumpyLike", npt.ArrayLike]): matrix
+
+        Returns:
+            NumpyLike: inverse of x
+        """
+        if isinstance(x, NumpyLike):
+            return NumpyLike(np.linalg.inv(x.array))
+        else:
+            return NumpyLike(np.linalg.inv(x))
+
+    @staticmethod
+    def solve(A: "NumpyLike", b: "NumpyLike") -> "NumpyLike":
+        """
+        Args:
+            A (NumpyLike): matrix
+            b (NumpyLike): vector
+
+        Returns:
+            NumpyLike: solution of Ax=b
+        """
+        return NumpyLike(np.linalg.solve(A.array, b.array))

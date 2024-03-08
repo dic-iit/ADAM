@@ -107,6 +107,12 @@ class JaxLike(ArrayLike):
         """Overrides - operator"""
         return JaxLike(-self.array)
 
+    def __eq__(self, other: Union["JaxLike", npt.ArrayLike]) -> bool:
+        """Overrides == operator"""
+        if type(self) is not type(other):
+            return self.array.squeeze() == other.squeeze()
+        return self.array.squeeze() == other.array.squeeze()
+
 
 class JaxLikeFactory(ArrayLikeFactory):
     @staticmethod
@@ -189,6 +195,31 @@ class SpatialMath(SpatialMath):
         return JaxLike(-jnp.cross(jnp.array(x), jnp.eye(3), axisa=0, axisb=0))
 
     @staticmethod
+    def vee(x: Union["JaxLike", npt.ArrayLike]) -> "JaxLike":
+        """
+        Args:
+            x (Union[JaxLike, npt.ArrayLike]): matrix
+
+        Returns:
+            JaxLike: the vee operator from x
+        """
+        if not isinstance(x, JaxLike):
+            return JaxLike(jnp.array([x[2, 1], x[0, 2], x[1, 0]]))
+        x = x.array
+        return JaxLike(jnp.array([x[2, 1], x[0, 2], x[1, 0]]))
+
+    @staticmethod
+    def inv(x: "JaxLike") -> "JaxLike":
+        """
+        Args:
+            x (JaxLike): Matrix
+
+        Returns:
+            JaxLike: Inverse of x
+        """
+        return JaxLike(jnp.linalg.inv(x.array))
+
+    @staticmethod
     def vertcat(*x) -> "JaxLike":
         """
         Returns:
@@ -211,3 +242,15 @@ class SpatialMath(SpatialMath):
         else:
             v = jnp.hstack([x[i] for i in range(len(x))])
         return JaxLike(v)
+
+    @staticmethod
+    def solve(A: "JaxLike", b: "JaxLike") -> "JaxLike":
+        """
+        Args:
+            A (JaxLike): Matrix
+            b (JaxLike): Vector
+
+        Returns:
+            JaxLike: Solution of Ax=b
+        """
+        return JaxLike(jnp.linalg.solve(A.array, b.array))

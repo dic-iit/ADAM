@@ -1,5 +1,7 @@
 import dataclasses
-from typing import Dict, Iterable, List, Tuple, Union
+import logging
+
+from typing import Dict, Iterable, List, Tuple, Union, Set, Iterator
 
 from adam.model.abc_factories import Joint, Link
 
@@ -31,7 +33,7 @@ class Node:
 class Tree(Iterable):
     """The directed tree class"""
 
-    graph: Dict
+    graph: Dict[str, Node]
     root: str
 
     def __post_init__(self):
@@ -48,7 +50,7 @@ class Tree(Iterable):
         Returns:
             Tree: the directed tree
         """
-        nodes: Dict(str, Node) = {
+        nodes: Dict[str, Node] = {
             l.name: Node(
                 name=l.name, link=l, arcs=[], children=[], parent=None, parent_arc=None
             )
@@ -70,6 +72,78 @@ class Tree(Iterable):
         if len(root_link) != 1:
             raise ValueError("The model has more than one root link")
         return Tree(nodes, root_link[0])
+
+    def reduce(self, considered_joint_names: List[str]) -> "Tree":
+        """reduces the tree to the considered joints
+
+        Args:
+            considered_joint_names (List[str]): the list of the considered joints
+
+        Returns:
+            Tree: the reduced tree
+        """
+
+        relative_transform = lambda node: (
+            node.link.math.inv(
+                self.graph[node.parent.name].parent_arc.spatial_transform(0)
+            )
+            @ node.parent_arc.spatial_transform(0)
+            if node.parent.name != self.root
+            else node.parent_arc.spatial_transform(0)
+        )
+
+        # find the fixed joints using the considered_joint_names
+        fixed_joints = [
+            joint
+            for joint in self.get_joint_list()
+            if joint.name not in considered_joint_names
+        ]
+        # set fixed joints to fixed
+        for joint in fixed_joints:
+            joint.type = "fixed"
+
+        for fixed_j in fixed_joints:
+            saved_node = self.graph[fixed_j.parent]
+            removing_node = self.graph[fixed_j.child]
+
+            saved_node.children.remove(removing_node)
+            saved_node.children.extend(removing_node.children)
+            # update the arcs
+            saved_node.arcs.remove(fixed_j)
+            saved_node.arcs.extend(removing_node.arcs)
+
+            # saved_node.link = saved_node.link.lump(
+            #     other=removing_node.link, joint=fixed_j
+            # )
+
+            # merged_joint = saved_node.parent_arc
+            # removed_joint = removing_node.parent_arc
+            # update the parent arc of the merged node
+            # saved_node.parent_arc = saved_node.parent_arc.lump(removed_joint)
+
+            # we need to updated the parents and child on the joints in fixed_joints
+            for joint in self.get_joint_list():
+                if joint.parent == removing_node.name:
+                    joint.parent = saved_node.name
+                if joint.child == removing_node.name:
+                    joint.child = saved_node.name
+
+            for child in saved_node.children:
+                child.parent = saved_node.link
+                child.parent_arc = saved_node.parent_arc
+
+            self.graph.pop(removing_node.name)
+            self.graph[saved_node.name] = saved_node
+
+        if {joint.name for joint in self.get_joint_list()} != set(
+            considered_joint_names
+        ):
+            raise ValueError(
+                "The joints remaining in the graph are not equal to the considered joints"
+            )
+        tree = Tree(self.graph, self.root)
+        tree.print(self.root)
+        return Tree(self.graph, self.root)
 
     def print(self, root) -> str:
         """prints the tree
@@ -136,7 +210,21 @@ class Tree(Iterable):
         """
         return self.graph[name]
 
-    def __iter__(self) -> Node:
+    def is_floating_base(self) -> bool:
+        """
+        Returns:
+            bool: True if the model is floating base
+        """
+        return len(self.graph[self.root].children) > 1
+
+    def get_joint_list(self) -> Set[Joint]:
+        """
+        Returns:
+            Set[Joint]: the set of the joints
+        """
+        return {arc for node in self.graph.values() for arc in node.arcs}
+
+    def __iter__(self) -> Iterator[Node]:
         """This method allows to iterate on the model
         Returns:
             Node: the node istance
@@ -146,7 +234,7 @@ class Tree(Iterable):
         """
         yield from [self.graph[name] for name in self.ordered_nodes_list]
 
-    def __reversed__(self) -> Node:
+    def __reversed__(self) -> Iterator[Node]:
         """
         Returns:
             Node

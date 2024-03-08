@@ -122,6 +122,13 @@ class TorchLike(ArrayLike):
         """Overrides - operator"""
         return TorchLike(-self.array)
 
+    def __eq__(self, other: Union["TorchLike", ntp.ArrayLike]) -> bool:
+        """Overrides == operator"""
+        if type(self) is type(other):
+            return self.array == other.array
+        else:
+            return self.array == other
+
 
 class TorchLikeFactory(ArrayLikeFactory):
     @staticmethod
@@ -214,6 +221,36 @@ class SpatialMath(SpatialMath):
         )
 
     @staticmethod
+    def vee(x: Union["TorchLike", ntp.ArrayLike]) -> "TorchLike":
+        """
+        Args:
+            x (Union["TorchLike", ntp.ArrayLike]): matrix
+
+        Returns:
+            TorchLike: vector from skew matrix x
+        """
+        if isinstance(x, TorchLike):
+            return TorchLike(
+                torch.tensor([x.array[2, 1], x.array[0, 2], x.array[1, 0]])
+            )
+        else:
+            return TorchLike(torch.tensor([x[2, 1], x[0, 2], x[1, 0]]))
+
+    @staticmethod
+    def inv(x: Union["TorchLike", ntp.ArrayLike]) -> "TorchLike":
+        """
+        Args:
+            x (Union["TorchLike", ntp.ArrayLike]): matrix
+
+        Returns:
+            TorchLike: inverse of x
+        """
+        if isinstance(x, TorchLike):
+            return TorchLike(torch.inverse(x.array))
+        else:
+            return TorchLike(torch.inverse(torch.tensor(x)))
+
+    @staticmethod
     def vertcat(*x: ntp.ArrayLike) -> "TorchLike":
         """
         Returns:
@@ -236,3 +273,15 @@ class SpatialMath(SpatialMath):
         else:
             v = torch.tensor(x)
         return TorchLike(v)
+
+    @staticmethod
+    def solve(A: "TorchLike", b: "TorchLike") -> "TorchLike":
+        """
+        Args:
+            A (TorchLike): matrix
+            b (TorchLike): vector
+
+        Returns:
+            TorchLike: solution of Ax = b
+        """
+        return TorchLike(torch.linalg.solve(A.array, b.array))

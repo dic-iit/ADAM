@@ -93,6 +93,12 @@ class CasadiLike(ArrayLike):
         """Overrides get item operator"""
         return CasadiLike(self.array[idx])
 
+    def __eq__(self, other: Union["CasadiLike", npt.ArrayLike]) -> bool:
+        """Overrides == operator"""
+        if type(self) is not type(other):
+            return self.array == other
+        return self.array == other.array
+
     @property
     def T(self) -> "CasadiLike":
         """
@@ -150,6 +156,39 @@ class SpatialMath(SpatialMath):
             return CasadiLike(cs.skew(x))
 
     @staticmethod
+    def vee(x: Union["CasadiLike", npt.ArrayLike]) -> "CasadiLike":
+        """
+        Args:
+            x (Union[CasadiLike, npt.ArrayLike]): 3x3 matrix
+
+        Returns:
+            CasadiLike: the vector from the skew symmetric matrix x
+        """
+        vee = lambda x: cs.vertcat(x[2, 1], x[0, 2], x[1, 0])
+        if isinstance(x, CasadiLike):
+            return CasadiLike(vee(x.array))
+        else:
+            return CasadiLike(vee(x))
+
+    @staticmethod
+    def inv(x: Union["CasadiLike", npt.ArrayLike]) -> "CasadiLike":
+        """
+        Args:
+            x (Union[CasadiLike, npt.ArrayLike]): matrix
+
+        Returns:
+            CasadiLike: inverse of x
+        """
+        if isinstance(x, CasadiLike):
+            return CasadiLike(cs.inv(x.array))
+        else:
+            return (
+                CasadiLike(cs.inv(x))
+                if x.size1() <= 5
+                else CasadiLike(self.solve(x, self.eye(x.size1())))
+            )
+
+    @staticmethod
     def sin(x: npt.ArrayLike) -> "CasadiLike":
         """
         Args:
@@ -205,6 +244,18 @@ class SpatialMath(SpatialMath):
 
         y = [xi.array if isinstance(xi, CasadiLike) else xi for xi in x]
         return CasadiLike(cs.horzcat(*y))
+
+    @staticmethod
+    def solve(A: "CasadiLike", b: "CasadiLike") -> "CasadiLike":
+        """
+        Args:
+            A (CasadiLike): matrix
+            b (CasadiLike): vector
+
+        Returns:
+            CasadiLike: solution of A*x=b
+        """
+        return CasadiLike(cs.solve(A.array, b.array))
 
 
 if __name__ == "__main__":

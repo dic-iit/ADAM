@@ -18,6 +18,7 @@ class Model:
     tree: Tree
     NDoF: int
     actuated_joints: List[str]
+    floating_base: bool = True
 
     def __post_init__(self):
         """set the "length of the model as the number of links"""
@@ -61,10 +62,12 @@ class Model:
 
         tree = Tree.build_tree(links=links, joints=joints)
 
+        floating_base = tree.is_floating_base()
+
         # generate some useful dict
-        joints: Dict(str, Joint) = {joint.name: joint for joint in joints}
-        links: Dict(str, Link) = {link.name: link for link in links}
-        frames: Dict(str, Link) = {frame.name: frame for frame in frames}
+        joints: Dict[str, Joint] = {joint.name: joint for joint in joints}
+        links: Dict[str, Link] = {link.name: link for link in links}
+        frames: Dict[str, Link] = {frame.name: frame for frame in frames}
 
         return Model(
             name=factory.name,
@@ -74,6 +77,40 @@ class Model:
             tree=tree,
             NDoF=len(joints_name_list),
             actuated_joints=joints_name_list,
+            floating_base=floating_base,
+        )
+
+    def reduce(self, joints_name_list: List[str]) -> "Model":
+        """reduce the model to a subset of joints
+
+        Args:
+            joints_name_list (List[str]): the list of the joints to keep
+
+        Returns:
+            Model: the reduced model
+        """
+
+        tree = self.tree.reduce(joints_name_list)
+
+        links = {node.name: node.link for node in tree.graph.values()}
+        joints = {
+            joint.name: joint
+            for joint in self.joints.values()
+            if joint.name in joints_name_list
+        }
+        for link in self.links:
+            if link not in tree.graph:
+                self.frames[link] = link
+
+        return Model(
+            name=self.name,
+            links=links,
+            frames=self.frames,
+            joints=joints,
+            tree=tree,
+            NDoF=len(joints_name_list),
+            actuated_joints=joints_name_list,
+            floating_base=self.floating_base,
         )
 
     def get_joints_chain(self, root: str, target: str) -> List[Joint]:
@@ -87,24 +124,24 @@ class Model:
             List[Joint]: the list of the joints
         """
 
-        if target not in list(self.links) and target not in list(self.frames):
+        if target not in list(self.frames) and target not in list(self.tree.graph):
             raise ValueError(f"{target} is not not in the robot model.")
 
         if target == root:
             return []
         chain = []
-        current_node = [
+        current_joint = [
             joint for joint in self.joints.values() if joint.child == target
         ][0]
 
-        chain.insert(0, current_node)
-        while current_node.parent != root:
-            current_node = [
+        chain.insert(0, current_joint)
+        while current_joint.parent != root:
+            current_joint = [
                 joint
                 for joint in self.joints.values()
-                if joint.child == current_node.parent
+                if joint.child == current_joint.parent
             ][0]
-            chain.insert(0, current_node)
+            chain.insert(0, current_joint)
         return chain
 
     def get_total_mass(self) -> float:

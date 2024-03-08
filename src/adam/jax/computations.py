@@ -239,3 +239,35 @@ class KinDynComputations:
             mass: The total mass
         """
         return self.rbdalgos.get_total_mass()
+
+    def forward_dynamics(
+        self,
+        base_transform: jnp.array,
+        base_velocity: jnp.array,
+        joint_positions: jnp.array,
+        joint_velocities: jnp.array,
+        joint_torques: jnp.array,
+    ) -> jnp.array:
+        """Returns base and joints accelerations of the floating-base dynamics equation
+
+        Args:
+            base_transform (jnp.array): The homogenous transform from base to world frame
+            base_velocity (jnp.array): The base velocity in mixed representation
+            joint_positions (jnp.array): The joints position
+            joint_velocities (jnp.array): The joints velocity
+            joint_torques (jnp.array): The joints torques
+
+        Returns:
+            base_acceleration (jnp.array): The base acceleration in mixed representation
+            joint_accelerations (jnp.array): The joints acceleration
+        """
+        base_acceleration, joint_accelerations = self.rbdalgos.aba(
+            base_transform,
+            base_velocity,
+            joint_positions,
+            joint_velocities,
+            joint_torques,
+            self.g,
+        )
+
+        return base_acceleration.array.squeeze(), joint_accelerations.array.squeeze()
