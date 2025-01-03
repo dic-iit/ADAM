@@ -73,15 +73,15 @@ class Tree(Iterable):
             )
         return Tree(nodes, root_link[0])
 
-    def print(self, root):
-        """prints the tree
+    def show(self):
+        """prints the tree"""
+        self.print()
 
-        Args:
-            root (str): the root of the tree
-        """
+    def print(self):
+        """prints the tree"""
         import pptree
 
-        pptree.print_tree(self.graph[root])
+        pptree.print_tree(self.graph[self.root])
 
     def get_ordered_nodes_list(self, start: str) -> list[str]:
         """get the ordered list of the nodes, given the connectivity
